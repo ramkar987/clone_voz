@@ -18,7 +18,11 @@ def init_kokoro_pipeline() -> Optional[object]:
     try:
         from kokoro import KPipeline
         st.info("⚙️ Carregando Kokoro TTS (82M params)...")
-        pipeline = KPipeline(lang_code='en')
+# Se quiser o modelo em Inglês Americano:
+pipeline = KPipeline(lang_code='a')
+
+# OU, se o seu projeto for focado em Português:
+# pipeline = KPipeline(lang_code='p')
         st.success("✅ Kokoro carregado! (86MB, 3-5x mais rápido)")
         return pipeline
     except ImportError as e:
