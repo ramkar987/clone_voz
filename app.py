@@ -1,19 +1,23 @@
 """
-Aplicativo Streamlit principal para Clone de Voz Kokoro TTS.
-Kokoro-82M: 82M params, 3-5x mais rápido, 86MB (vs 1.7GB do XTTS).
+Aplicativo Streamlit principal - Kokoro TTS.
+Entry point: streamlit run app.py
 """
 
 from pathlib import Path
 import streamlit as st
 
-from config import STREAMIT_TITLE, STREAMIT_ICON, SUPPORTED_LANGUAGES, get_voice_list, get_kokoro_native_voices
-from voice_cloning import init_kokoro_pipeline, save_voice, delete_voice
+# Imports dos módulos (adiciona modules/ ao path)
+import sys
+sys.path.insert(0, str(Path(__file__).parent / "modules"))
+
+from config import STREAMIT_TITLE, STREAMIT_ICON, SUPPORTED_LANGUAGES
+from voice_cloning import init_kokoro_pipeline, save_voice, delete_voice, get_voice_list, get_kokoro_native_voices
 from tts_synthesis import synthesize_speech_kokoro, synthesize_speech_kokoro_demo, validate_speed
-from audio_capture import upload_audio_file, record_audio, convert_to_wav
+from audio_capture import upload_audio_file, convert_to_wav
 
-st.set_page_config(page_title=STREAMIT_TITLE, page_icon=STREAMIT_ICON, layout="wide")
+st.set_page_config(page_title=STREAMIT_TITLE, page_icon="🎙️", layout="wide")
 
-st.title(f"{STREAMIT_ICON} {STREAMIT_TITLE}")
+st.title(f"🎙️ {STREAMIT_TITLE}")
 st.markdown("---")
 
 st.info("""
@@ -29,58 +33,50 @@ tab_clonar, tab_gen = st.tabs(["🎤 Clonar Voz", "🎧 Gerar Áudio"])
 
 # ==================== ABA 1: CLONAR VOZ ====================
 with tab_clonar:
-    st.header("Clonar uma Nova Voz com Kokoro")
+    st.header("Clonar Voz com Kokoro")
     
-    if upload_audio_file():
-        file_bytes, filename, duration = upload_audio_file()
+    audio_data = upload_audio_file()
+    
+    if audio_data:
+        file_bytes, filename, duration = audio_data
         
         with st.form("clonagem_form"):
             nome_voz = st.text_input("Nome da voz", placeholder="Ex: Minha Voz...")
-            lingua = st.selectbox(
-                "Língua do áudio",
-                options=list(SUPPORTED_LANGUAGES.keys()),
-                format_func=lambda x: SUPPORTED_LANGUAGES[x]
-            )
+            lingua = st.selectbox("Língua", options=list(SUPPORTED_LANGUAGES.keys()), format_func=lambda x: SUPPORTED_LANGUAGES[x])
             btn_clonar = st.form_submit_button("🎤 Clonar Voz")
         
-        if btn_clonar and nome_voz.strip():
-            ext = Path(filename).suffix.lower()
-            if ext != "wav":
-                file_bytes = convert_to_wav(file_bytes, ext)
-            
-            with st.spinner("🔄 Processando voz..."):
-                voice_meta = save_voice(
-                    name=nome_voz.strip(),
-                    audio_bytes=file_bytes,
-                    duration=duration,
-                    language=lingua
-                )
-            
-            if voice_meta:
-                st.success(f"✅ Voz '{nome_voz}' clonada!")
-                st.json(voice_meta)
+        if btn_clonar:
+            if not nome_voz.strip():
+                st.error("❌ Digite nome.")
+            else:
+                ext = Path(filename).suffix.lower()
+                if ext != "wav":
+                    file_bytes = convert_to_wav(file_bytes, ext)
+                
+                with st.spinner("🔄 Processando..."):
+                    voice_meta = save_voice(nome_voz.strip(), file_bytes, duration, lingua)
+                
+                if voice_meta:
+                    st.success(f"✅ Voz '{nome_voz}' clonada!")
+                    st.json(voice_meta)
 
 # ==================== ABA 2: GERAR ÁUDIO ====================
 with tab_gen:
     st.header("Gerar Áudio com Kokoro")
     
     pipeline = init_kokoro_pipeline()
-    
     if pipeline is None:
-        st.error("❌ Kokoro não carregado. Instale: pip install -r requirements.txt")
+        st.error("❌ Kokoro não carregado. Execute: pip install -r requirements.txt")
         st.stop()
     
-    # Vozes: nativas + clonadas
     vozes_nativas = get_kokoro_native_voices()
     vozes_clonadas = get_voice_list()
     
     st.subheader("📚 Selecionar Voz")
     
     voz_options = {}
-    for v in vozes_nativas:
-        voz_options[f"🔊 {v['name']} (nativa)"] = v['voice_id']
-    for v in vozes_clonadas:
-        voz_options[f"🎤 {v['name']} (clonada)"] = v['voice_id']
+    for v in vozes_nativas: voz_options[f"🔊 {v['name']} (nativa)"] = v['voice_id']
+    for v in vozes_clonadas: voz_options[f"🎤 {v['name']} (clonada)"] = v['voice_id']
     
     voz_selecionada = st.selectbox("Voz", options=list(voz_options.keys()))
     
@@ -100,6 +96,7 @@ with tab_gen:
             elif not validate_speed(speed):
                 st.error("❌ Velocidade inválida.")
             else:
+                audio_bytes = None
                 if is_native:
                     audio_bytes = synthesize_speech_kokoro_demo(pipeline, texto, voice_id, lingua_tts, speed)
                 else:
@@ -108,7 +105,6 @@ with tab_gen:
                         audio_bytes = synthesize_speech_kokoro(pipeline, texto, voz_meta["sample_path"], lingua_tts, speed)
                     else:
                         st.error("❌ Áudio de referência não encontrado.")
-                        audio_bytes = None
                 
                 if audio_bytes:
                     st.subheader("🔊 Resultado")
