@@ -19,7 +19,7 @@ def init_kokoro_pipeline() -> Optional[object]:
         from kokoro import KPipeline
         st.info("⚙️ Carregando Kokoro TTS (82M params)...")
 # Se quiser o modelo em Inglês Americano:
-pipeline = KPipeline(lang_code='a')
+        pipeline = KPipeline(lang_code='a')
 
 # OU, se o seu projeto for focado em Português:
 # pipeline = KPipeline(lang_code='p')
