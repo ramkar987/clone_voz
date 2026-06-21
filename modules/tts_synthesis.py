@@ -1,5 +1,10 @@
 """Module para síntese TTS com Kokoro."""
 
+import sys
+from pathlib import Path
+
+# O restante do seu código atual continua logo abaixo...
+
 import os
 import tempfile
 from typing import Optional
